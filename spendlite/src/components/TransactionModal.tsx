@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Button, DatePicker, Form, Input, InputNumber, Modal, Select, Typography, } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
-import type { TransactionFormValues } from '../schemas/transactionSchema'
+import type { Transaction, TransactionFormValues } from '../schemas/transactionSchema'
 
 type FormValues = Omit<TransactionFormValues, 'date'> & {
     date: Dayjs
@@ -12,25 +12,41 @@ type Props = {
     saving: boolean
     onClose: () => void
     onSubmit: (values: FormValues) => void
+    initialTransaction?: Transaction | null
 }
 
 const categories = ['Food', 'Transport', 'Shopping', 'Utilities', 'Lifestyle', 'Health', 'Education', 'Salary', 'Freelance', 'Other',]
 
-export default function TransactionModal({ open, saving, onClose, onSubmit, }: Props) {
+export default function TransactionModal({ open, saving, onClose, onSubmit, initialTransaction, }: Props) {
     const [form] = Form.useForm<FormValues>()
 
     useEffect(() => {
         if (open) {
-            form.setFieldsValue({
-                type: 'expense',
-                date: dayjs(),
-            })
+            form.setFieldsValue(
+                initialTransaction
+                    ? {
+                        type: initialTransaction.type,
+                        description: initialTransaction.description,
+                        amount: initialTransaction.amount,
+                        category: initialTransaction.category,
+                        date: dayjs(initialTransaction.date),
+                    }
+                    : {
+                        type: 'expense',
+                        date: dayjs(),
+                        description: '',
+                        amount: undefined,
+                        category: undefined,
+                    },
+            )
+        } else {
+            form.resetFields()
         }
-    }, [open, form])
+    }, [open, initialTransaction, form])
 
     return (
         <Modal
-            title="Add transaction"
+            title={initialTransaction ? 'Edit transaction' : 'Add transaction'}
             open={open}
             onCancel={onClose}
             footer={null}
@@ -132,7 +148,7 @@ export default function TransactionModal({ open, saving, onClose, onSubmit, }: P
                 <div className="flex justify-end gap-2">
                     <Button onClick={onClose}>Cancel</Button>
                     <Button type="primary" htmlType="submit" loading={saving}>
-                        Save transaction
+                        {initialTransaction ? 'Save changes' : 'Save transaction'}
                     </Button>
                 </div>
             </Form>

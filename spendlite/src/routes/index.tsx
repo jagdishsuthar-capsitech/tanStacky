@@ -8,9 +8,10 @@ import DashboardHeader from '../components/DashboardHeader'
 import SummaryCards from '../components/SummaryCards'
 import TransactionTable from '../components/TransactionTable'
 import TransactionModal from '../components/TransactionModal'
-import { getTransactions, addTransaction, deleteTransaction, } from '../lib/transactions'
+import { getTransactions, addTransaction, deleteTransaction, updateTransaction, } from '../lib/transactions'
 import { transactionSchema } from '../schemas/transactionSchema'
 import type { Transaction } from '../schemas/transactionSchema'
+import type { Dayjs } from 'dayjs'
 
 export const Route = createFileRoute('/')({
   component: Dashboard,
@@ -29,6 +30,9 @@ function Dashboard() {
     queryFn: getTransactions,
   })
 
+  const [editingTransaction, setEditingTransaction] =
+    useState<Transaction | null>(null)
+
   const addMutation = useMutation({
     mutationFn: addTransaction,
     onSuccess: (updatedTransactions) => {
@@ -38,6 +42,26 @@ function Dashboard() {
     },
     onError: () => {
       message.error('Could not save transaction. Please try again.')
+    },
+  })
+
+  const editMutation = useMutation({
+    mutationFn: ({
+      key,
+      transaction,
+    }: {
+      key: string
+      transaction: Omit<Transaction, 'key'>
+    }) => updateTransaction(key, transaction),
+
+    onSuccess: (updatedTransactions) => {
+      queryClient.setQueryData(['transactions'], updatedTransactions)
+      message.success('Transaction updated successfully!')
+      setEditingTransaction(null)
+    },
+
+    onError: () => {
+      message.error('Could not update transaction. Please try again.')
     },
   })
 
@@ -83,6 +107,34 @@ function Dashboard() {
     addMutation.mutate(result.data)
   }
 
+  function handleEditSubmit(values: {
+    type: 'expense' | 'income'
+    description: string
+    amount: number
+    category: string
+    date: Dayjs
+  }) {
+    if (!editingTransaction) return
+
+    const result = transactionSchema.safeParse({
+      ...values,
+      description: values.description.trim(),
+      date: values.date?.format('YYYY-MM-DD') ?? '',
+    })
+
+    if (!result.success) {
+      message.error(
+        result.error.issues[0]?.message ?? 'Invalid transaction',
+      )
+      return
+    }
+
+    editMutation.mutate({
+      key: editingTransaction.key,
+      transaction: result.data,
+    })
+  }
+
   function handleDelete(transaction: Transaction) {
     modal.confirm({
       title: 'Delete transaction?',
@@ -100,7 +152,10 @@ function Dashboard() {
         <DashboardHeader
           dark={dark}
           onToggleTheme={toggleTheme}
-          onAddTransaction={() => setIsModalOpen(true)}
+          onAddTransaction={() => {
+            setEditingTransaction(null)
+            setIsModalOpen(true)
+          }}
         />
 
         <section className="mb-8">
@@ -141,9 +196,11 @@ function Dashboard() {
                 loading={
                   isLoading ||
                   addMutation.isPending ||
-                  deleteMutation.isPending
+                  deleteMutation.isPending ||
+                  editMutation.isPending
                 }
                 onDelete={handleDelete}
+                onEdit={(transaction) => setEditingTransaction(transaction)}
               />
             )}
           </Card>
@@ -156,10 +213,16 @@ function Dashboard() {
         </footer>
 
         <TransactionModal
-          open={isModalOpen}
-          saving={addMutation.isPending}
-          onClose={() => setIsModalOpen(false)}
-          onSubmit={handleSubmit}
+          open={isModalOpen || editingTransaction !== null}
+          saving={addMutation.isPending || editMutation.isPending}
+          onClose={() => {
+            setIsModalOpen(false)
+            setEditingTransaction(null)
+          }}
+          onSubmit={
+            editingTransaction ? handleEditSubmit : handleSubmit
+          }
+          initialTransaction={editingTransaction}
         />
       </div>
     </main>

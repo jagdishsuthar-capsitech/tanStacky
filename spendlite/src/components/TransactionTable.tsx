@@ -1,6 +1,6 @@
 import { Button, Space, Table, Tag, Typography } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined, } from '@ant-design/icons'
+import { ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined, EditOutlined, } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import type { Transaction } from '../schemas/transactionSchema'
 
@@ -9,6 +9,7 @@ type Props = {
     dark: boolean
     loading: boolean
     onDelete: (transaction: Transaction) => void
+    onEdit: (transaction: Transaction) => void
 }
 
 const money = (amount: number) =>
@@ -18,7 +19,7 @@ const money = (amount: number) =>
         maximumFractionDigits: 0,
     }).format(amount)
 
-export default function TransactionTable({ transactions, dark, loading, onDelete, }: Props) {
+export default function TransactionTable({ transactions, dark, loading, onDelete, onEdit, }: Props) {
     const columns: TableColumnsType<Transaction> = [
         {
             title: 'Transaction',
@@ -73,13 +74,22 @@ export default function TransactionTable({ transactions, dark, loading, onDelete
             key: 'action',
             align: 'right',
             render: (_value, record) => (
-                <Button
-                    danger
-                    type="text"
-                    icon={<DeleteOutlined />}
-                    aria-label={`Delete ${record.description}`}
-                    onClick={() => onDelete(record)}
-                />
+                <Space>
+                    <Button
+                        type="text"
+                        icon={<EditOutlined />}
+                        aria-label={`Edit ${record.description}`}
+                        onClick={() => onEdit(record)}
+                    />
+
+                    <Button
+                        danger
+                        type="text"
+                        icon={<DeleteOutlined />}
+                        aria-label={`Delete ${record.description}`}
+                        onClick={() => onDelete(record)}
+                    />
+                </Space>
             ),
         },
     ]

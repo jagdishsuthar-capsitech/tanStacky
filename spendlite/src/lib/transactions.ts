@@ -50,6 +50,22 @@ export async function addTransaction(transaction: Omit<Transaction, 'key'>,): Pr
     return updated
 }
 
+export async function updateTransaction(key: string, transaction: Omit<Transaction, 'key'>,): Promise<Transaction[]> {
+    const transactions = getTransactions()
+
+    const updated = transactions.map((item) =>
+        item.key === key
+            ? { ...transaction, key: item.key }
+            : item,
+    )
+
+    if (isBrowser()) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+    }
+
+    return updated
+}
+
 export async function deleteTransaction(key: string,): Promise<Transaction[]> {
     const updated = getTransactions().filter(
         (transaction) => transaction.key !== key,
