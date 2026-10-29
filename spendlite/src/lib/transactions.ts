@@ -1,20 +1,16 @@
 import { z } from 'zod'
+import type { Transaction } from '../schemas/transactionSchema'
 
 const transactionSchema = z.object({
     key: z.string(),
     type: z.enum(['expense', 'income']),
     description: z.string(),
-    amount: z.number().positive(),
+    amount: z.number().positive().finite(),
     category: z.string(),
     date: z.string(),
 })
 
-export type Transaction = z.infer<typeof transactionSchema>
-
 const STORAGE_KEY = 'spendlite-transactions'
-
-// store data here
-const initialTransactions: Transaction[] = []
 
 function isBrowser() {
     return typeof window !== 'undefined'
@@ -26,13 +22,7 @@ export function getTransactions(): Transaction[] {
     try {
         const stored = localStorage.getItem(STORAGE_KEY)
 
-        if (stored === null) {
-            localStorage.setItem(
-                STORAGE_KEY,
-                JSON.stringify(initialTransactions),
-            )
-            return initialTransactions
-        }
+        if (!stored) return []
 
         const parsed: unknown = JSON.parse(stored)
         const result = z.array(transactionSchema).safeParse(parsed)
@@ -43,9 +33,7 @@ export function getTransactions(): Transaction[] {
     }
 }
 
-export async function addTransaction(
-    transaction: Omit<Transaction, 'key'>,
-): Promise<Transaction[]> {
+export async function addTransaction(transaction: Omit<Transaction, 'key'>,): Promise<Transaction[]> {
     const transactions = getTransactions()
 
     const newTransaction: Transaction = {
@@ -55,21 +43,19 @@ export async function addTransaction(
 
     const updated = [newTransaction, ...transactions]
 
-    if (typeof window !== 'undefined') {
+    if (isBrowser()) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
     }
 
     return updated
 }
 
-export async function deleteTransaction(
-    key: string,
-): Promise<Transaction[]> {
+export async function deleteTransaction(key: string,): Promise<Transaction[]> {
     const updated = getTransactions().filter(
         (transaction) => transaction.key !== key,
     )
 
-    if (typeof window !== 'undefined') {
+    if (isBrowser()) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
     }
 
