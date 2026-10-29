@@ -1,79 +1,51 @@
-import { z } from 'zod'
-import type { Transaction } from '../schemas/transactionSchema'
+import type { Transaction } from "../schemas/transactionSchema";
 
-const transactionSchema = z.object({
-    key: z.string(),
-    type: z.enum(['expense', 'income']),
-    description: z.string(),
-    amount: z.number().positive().finite(),
-    category: z.string(),
-    date: z.string(),
-})
+const API_URL = process.env.API_URL || "http://localhost:5000/api/transactions";
 
-const STORAGE_KEY = 'spendlite-transactions'
+type TransactionInput = Omit<Transaction, "key">;
 
-function isBrowser() {
-    return typeof window !== 'undefined'
-}
+async function request<T>(url: string, options?: RequestInit): Promise<T> {
+    const response = await fetch(url, {
+        ...options,
+        headers: {
+            "Content-Type": "application/json",
+            ...options?.headers,
+        },
+    });
 
-export function getTransactions(): Transaction[] {
-    if (!isBrowser()) return []
-
-    try {
-        const stored = localStorage.getItem(STORAGE_KEY)
-
-        if (!stored) return []
-
-        const parsed: unknown = JSON.parse(stored)
-        const result = z.array(transactionSchema).safeParse(parsed)
-
-        return result.success ? result.data : []
-    } catch {
-        return []
-    }
-}
-
-export async function addTransaction(transaction: Omit<Transaction, 'key'>,): Promise<Transaction[]> {
-    const transactions = getTransactions()
-
-    const newTransaction: Transaction = {
-        ...transaction,
-        key: crypto.randomUUID(),
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || "API request failed");
     }
 
-    const updated = [newTransaction, ...transactions]
-
-    if (isBrowser()) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
-    }
-
-    return updated
+    return response.json() as Promise<T>;
 }
 
-export async function updateTransaction(key: string, transaction: Omit<Transaction, 'key'>,): Promise<Transaction[]> {
-    const transactions = getTransactions()
+export const getTransactions = () =>
+    request<Transaction[]>(API_URL);
 
-    const updated = transactions.map((item) =>
-        item.key === key
-            ? { ...transaction, key: item.key }
-            : item,
-    )
+export const addTransaction = async (transaction: TransactionInput): Promise<Transaction[]> => {
+    await request<Transaction>(API_URL, {
+        method: "POST",
+        body: JSON.stringify(transaction),
+    });
 
-    if (isBrowser()) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
-    }
+    return getTransactions();
+};
 
-    return updated
-}
+export const updateTransaction = async (key: string, transaction: TransactionInput): Promise<Transaction[]> => {
+    await request<Transaction>(`${API_URL}/${key}`, {
+        method: "PUT",
+        body: JSON.stringify(transaction),
+    });
 
-export async function deleteTransaction(key: string,): Promise<Transaction[]> {
-    const updated = getTransactions().filter(
-        (transaction) => transaction.key !== key,
-    )
+    return getTransactions();
+};
 
-    if (isBrowser()) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
-    }
+export const deleteTransaction = async (key: string): Promise<Transaction[]> => {
+    await request<{ message: string }>(`${API_URL}/${key}`, {
+        method: "DELETE",
+    });
 
-    return updated
-}
+    return getTransactions();
+};
